@@ -1,0 +1,1855 @@
+﻿import 'dart:io';
+
+import 'package:material_ui/material_ui.dart';
+
+import 'user_model.dart';
+import 'discover_map_page.dart';
+import 'home_feed_page.dart';
+import 'app_strings.dart';
+import 'settings_page.dart';
+
+// 0 = Home, 1 = Gallery, 2 = Chat, 3 = Pages, 4 = Profile
+final ValueNotifier<int> globalTabIndexNotifier = ValueNotifier<int>(0);
+
+class HomeScreen extends StatefulWidget {
+  final UserProfile user;
+  final int initialIndex;
+  const HomeScreen({super.key, required this.user, this.initialIndex = 0});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    globalTabIndexNotifier.value = widget.initialIndex;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MainScreen(user: widget.user);
+  }
+}
+
+class MainScreen extends StatelessWidget {
+  final UserProfile user;
+  const MainScreen({super.key, required this.user});
+
+  static const double _wideBreakpoint =
+      600; // Use 600px as the breakpoint for wide screens
+
+  @override
+  Widget build(BuildContext context) {
+    final List<Widget> pages = [
+      const HomePage(),
+      GalleryPage(user: user),
+      Theme(data: ThemeData.dark(), child: const ChatPage()),
+      const PagesPage(),
+      ProfilePage(user: user),
+    ];
+
+    return ValueListenableBuilder<String>(
+      valueListenable: globalLanguageNotifier,
+      builder: (context, currentLang, child) {
+        return ValueListenableBuilder<int>(
+          valueListenable: globalTabIndexNotifier,
+          builder: (context, selectedIndex, child) {
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final bool isWideScreen =
+                    constraints.maxWidth >= _wideBreakpoint; // Use 600px as the breakpoint for wide screens
+
+                return Scaffold(
+                  backgroundColor: Colors.white,
+                  body: Stack(
+                    children: [
+                      Row(
+                        children: [
+                          if (isWideScreen)
+                            _ExpandableSideRail(
+                              selectedIndex: selectedIndex,
+                              user: user,
+                              onTap: _onItemTapped,
+                            ),
+                          Expanded(child: _buildContent(pages, selectedIndex)),
+                        ],
+                      ),
+                      if (isWideScreen)
+                        Positioned(
+                          bottom: 20,
+                          right: 24,
+                          child: _buildChatPill(),
+                        ),
+                    ],
+                  ),
+                  bottomNavigationBar: isWideScreen
+                      ? null
+                      : BottomNavigationBar(
+                          currentIndex: selectedIndex,
+                          type: BottomNavigationBarType.fixed,
+                          selectedItemColor: Colors.black,
+                          unselectedItemColor: Colors.grey,
+                          onTap: _onItemTapped,
+                          items: [
+                            BottomNavigationBarItem(
+                              icon: const Icon(Icons.home_outlined),
+                              label: AppStrings.get('home'),
+                            ),
+                            BottomNavigationBarItem(
+                              icon: const Icon(Icons.collections_outlined),
+                              label: AppStrings.get('gallery'),
+                            ),
+                            BottomNavigationBarItem(
+                              icon: const Icon(Icons.chat_bubble_outline),
+                              label: AppStrings.get('chat'),
+                            ),
+                            BottomNavigationBarItem(
+                              icon: const Icon(Icons.grid_view_outlined),
+                              label: AppStrings.get('pages'),
+                            ),
+                            BottomNavigationBarItem(
+                              icon: const Icon(Icons.person_outline),
+                              label: AppStrings.get('profile'),
+                            ),
+                          ],
+                        ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _onItemTapped(int index) {
+    if (globalTabIndexNotifier.value == index) return;
+    globalTabIndexNotifier.value = index;
+  }
+
+  Widget _buildContent(List<Widget> pages, int selectedIndex) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        final offsetAnimation =
+            Tween<Offset>(
+              begin: const Offset(0.04, 0.0),
+              end: Offset.zero,
+            ).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeInOutCubic),
+            );
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(position: offsetAnimation, child: child),
+        );
+      },
+      child: KeyedSubtree(
+        key: ValueKey<int>(selectedIndex),
+        child: pages[selectedIndex],
+      ),
+    );
+  }
+
+  Widget _buildChatPill() {
+    return GestureDetector(
+      onTap: () => _onItemTapped(2),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: Colors.grey.shade300),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.send_outlined, color: Colors.black87, size: 20),
+            const SizedBox(width: 10),
+            Text(
+              AppStrings.get('chat'),
+              style: const TextStyle(
+                color: Colors.black87,
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 48,
+              height: 24,
+              child: Stack(
+                children: const [
+                  Positioned(
+                    left: 0,
+                    child: CircleAvatar(
+                      radius: 12,
+                      backgroundImage: AssetImage('assets/profile_1.jpeg'),
+                    ),
+                  ),
+                  Positioned(
+                    left: 14,
+                    child: CircleAvatar(
+                      radius: 12,
+                      backgroundImage: AssetImage('assets/profile_2.jpeg'),
+                    ),
+                  ),
+                  Positioned(
+                    left: 28,
+                    child: CircleAvatar(
+                      radius: 12,
+                      backgroundImage: AssetImage('assets/profile_3.jpeg'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Slim icon rail that expands to 230px on hover, revealing item labels.
+class _ExpandableSideRail extends StatefulWidget {
+  const _ExpandableSideRail({
+    required this.selectedIndex,
+    required this.user,
+    required this.onTap,
+  });
+
+  final int selectedIndex;
+  final UserProfile user;
+  final ValueChanged<int> onTap;
+
+  @override
+  State<_ExpandableSideRail> createState() => _ExpandableSideRailState();
+}
+
+class _ExpandableSideRailState extends State<_ExpandableSideRail> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isExpanded = true),
+      onExit: (_) => setState(() => _isExpanded = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOutCubic,
+        width: _isExpanded ? 230 : 72,
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(right: BorderSide(color: Colors.grey.shade200)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 48,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4),
+                    child: Icon(
+                      Icons.camera_alt_outlined,
+                      color: Colors.black87,
+                      size: 28,
+                    ),
+                  ),
+                  if (_isExpanded) ...[
+                    const SizedBox(width: 14),
+                    const SizedBox(
+                      width: 130,
+                      child: Text(
+                        'SocialApp',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildExpandableNavItem(
+              0,
+              Icons.home_outlined,
+              Icons.home,
+              AppStrings.get('home'),
+            ),
+            _buildExpandableNavItem(
+              1,
+              Icons.video_library_outlined,
+              Icons.video_library,
+              AppStrings.get('gallery'),
+            ),
+            _buildExpandableNavItem(
+              2,
+              Icons.send_outlined,
+              Icons.send,
+              AppStrings.get('chat'),
+            ),
+            _buildExpandableNavItem(
+              3,
+              Icons.explore_outlined,
+              Icons.explore,
+              AppStrings.get('pages'),
+            ),
+            _buildExpandableNavItem(
+              4,
+              Icons.person_outline,
+              Icons.person,
+              AppStrings.get('profile'),
+              isProfile: true,
+            ),
+            const Spacer(),
+            PopupMenuButton<String>(
+              offset: const Offset(0, -60),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              color: Colors.white,
+              elevation: 4,
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                PopupMenuItem<String>(
+                  value: 'settings',
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.settings_outlined,
+                        color: Colors.black87,
+                        size: 22,
+                      ),
+                      if (_isExpanded) ...[
+                        const SizedBox(width: 12),
+                        const SizedBox(
+                          width: 100,
+                          child: Text(
+                            'Settings',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+              onSelected: (String value) {
+                if (value == 'settings') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => const SettingsPage(),
+                    ),
+                  );
+                }
+              },
+              child: _buildBottomActionItem(
+                icon: Icons.menu,
+                label: 'More',
+                onTap: null,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandableNavItem(
+    int index,
+    IconData icon,
+    IconData activeIcon,
+    String label, {
+    bool isProfile = false,
+  }) {
+    final bool isSelected = widget.selectedIndex == index;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => widget.onTap(index),
+        child: Container(
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.grey.shade100 : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 26,
+                child: isProfile
+                    ? Container(
+                        padding: const EdgeInsets.all(1.5),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isSelected
+                                ? Colors.black
+                                : Colors.transparent,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: CircleAvatar(
+                          radius: 11,
+                          backgroundImage: _profileImage(widget.user),
+                        ),
+                      )
+                    : Icon(
+                        isSelected ? activeIcon : icon,
+                        color: Colors.black87,
+                        size: 26,
+                      ),
+              ),
+              if (_isExpanded) ...[
+                const SizedBox(width: 14),
+                SizedBox(
+                  width: 130,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomActionItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        height: 46,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 26,
+              child: Icon(icon, color: Colors.black87, size: 26),
+            ),
+            if (_isExpanded) ...[
+              const SizedBox(width: 14),
+              SizedBox(
+                width: 130,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 15, color: Colors.black87),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  ImageProvider _profileImage(UserProfile profile) {
+    final String path = profile.profileImagePath;
+    if (path.startsWith('assets/')) return AssetImage(path);
+    if (path.isEmpty) return const AssetImage('assets/profile_1.jpeg');
+    return FileImage(File(path));
+  }
+}
+
+// --- Individual Tab Views ---
+
+class GalleryPage extends StatefulWidget {
+  final UserProfile user;
+  const GalleryPage({super.key, required this.user});
+
+  @override
+  State<GalleryPage> createState() => _GalleryPageState();
+}
+
+class _GalleryPageState extends State<GalleryPage> {
+  bool isDarkMode = true; // Default dark theme
+
+  @override
+  Widget build(BuildContext context) {
+    ImageProvider getProfileImage() {
+      if (widget.user.profileImagePath.startsWith('assets/')) {
+        return AssetImage(widget.user.profileImagePath);
+      }
+      return FileImage(File(widget.user.profileImagePath));
+    }
+
+    final List<Map<String, String>> galleryItems = [
+      {
+        'image': 'assets/Diwali_1.jpg',
+        'title': 'Barcelona \n after dark',
+        'location': 'Barcelona, Spain',
+        'subtitle': 'Late dinners, tiny bars, nowhere to be early',
+        'footerText':
+            '${widget.user.userName.isNotEmpty ? widget.user.userName : "Maya"} found a swimming spot\n8 min away',
+        'tag1': '★ Local mood',
+        'tag2': '🕒 Best hour',
+        'tag3': '📍 Local tip',
+      },
+      {
+        'image': 'assets/Diwali_2.jpg',
+        'title': 'Festival of\nLights',
+        'location': 'Hyderabad, India',
+        'subtitle': 'Sweets, sparklers, and joyful moments',
+        'footerText': 'Celebration hub\n12 min away',
+        'tag1': '✨ Festive mood',
+        'tag2': '🌙 After 8 PM',
+        'tag3': '🪔 Diya Lights',
+      },
+    ];
+
+    return Theme(
+      data: isDarkMode ? ThemeData.dark() : ThemeData.light(),
+      child: Scaffold(
+        backgroundColor: isDarkMode ? Colors.black : Colors.white,
+        body: PageView.builder(
+          scrollDirection: Axis.vertical,
+          itemCount: galleryItems.length,
+          itemBuilder: (context, index) {
+            final item = galleryItems[index];
+            final imagePath = item['image']!;
+
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                // 1. Background Image
+                Image.asset(
+                  imagePath,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      Container(color: Colors.grey[900]),
+                ),
+
+                // 2. Dark Gradient Overlay
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.black54,
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.9),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+
+                // 3. Top Header Bar (Theme Toggle at Top-Left & Profile Info)
+                Positioned(
+                  top: 50,
+                  left: 16,
+                  right: 16,
+                  child: Row(
+                    children: [
+                      // Theme Toggle Button at Top-Left
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          shape: BoxShape.circle,
+                        ),
+                        // child: IconButton(
+                        //   icon: Icon(
+                        //     isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                        //     color: const Color.fromRGBO(10, 0, 0, 1),
+                        //     size: 20,
+                        //   ),
+                        //   onPressed: () {
+                        //     setState(() {
+                        //       isDarkMode = !isDarkMode;
+                        //     });
+                        //   },
+                        // ),
+                      ),
+                      const SizedBox(width: 8),
+                      CircleAvatar(
+                        radius: 16,
+                        backgroundImage: getProfileImage(),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Good morning, ${widget.user.userName.isNotEmpty ? widget.user.userName : "Maya"}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.grid_view_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          onPressed: () {},
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.notifications_none_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          onPressed: () {},
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 4. Right Side Action Icons
+                Positioned(
+                  right: 16,
+                  bottom: 160,
+                  child: Column(
+                    children: [
+                      _buildRightIconButton(Icons.bookmark_border),
+                      const SizedBox(height: 12),
+                      _buildRightIconButton(Icons.share_outlined),
+                      const SizedBox(height: 12),
+                      _buildRightIconButton(Icons.layers_outlined),
+                      const SizedBox(height: 12),
+                      _buildRightIconButton(Icons.map_outlined),
+                    ],
+                  ),
+                ),
+
+                // 5. Title, Location & Tags Layer
+                Positioned(
+                  left: 20,
+                  right: 80,
+                  bottom: 140,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item['title']!,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 34,
+                          fontWeight: FontWeight.bold,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on,
+                            color: Colors.white70,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            item['location']!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        item['subtitle']!,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          _buildTag(item['tag1']!),
+                          const SizedBox(width: 6),
+                          _buildTag(item['tag2']!),
+                          const SizedBox(width: 6),
+                          _buildTag(item['tag3']!),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 6. Bottom Floating Mini Card Preview
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 70,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 14,
+                          backgroundImage: getProfileImage(),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            item['footerText']!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.asset(
+                            imagePath,
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  color: Colors.grey[800],
+                                ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(
+                          Icons.arrow_forward_ios,
+                          color: Colors.white70,
+                          size: 14,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRightIconButton(IconData icon) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.4),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: Colors.white, size: 22),
+        onPressed: () {},
+      ),
+    );
+  }
+
+  Widget _buildTag(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
+class PagesPage extends StatefulWidget {
+  const PagesPage({super.key});
+
+  @override
+  State<PagesPage> createState() => _PagesPageState();
+}
+
+class _PagesPageState extends State<PagesPage> {
+  bool isDarkMode = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isDarkMode ? const Color(0xFF121212) : Colors.white;
+    final fg = isDarkMode ? Colors.white : Colors.black;
+    final sub = isDarkMode ? Colors.grey : Colors.black54;
+    final searchBg = isDarkMode ? const Color(0xFF1E1E1E) : Colors.grey[200]!;
+    final searchBorder = isDarkMode ? Colors.white10 : Colors.black12;
+
+    return Scaffold(
+      backgroundColor: bg,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- TOP BAR WITH MAPS TOGGLE & THEME TOGGLE AT TOP-LEFT ---
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const DiscoverMapPage(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color.fromARGB(255, 255, 255, 255),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(
+                            Icons.map_rounded,
+                            color: Colors.blueAccent,
+                            size: 20,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Map',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isDarkMode ? Colors.white10 : Colors.black12,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: Icon(
+                        isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                        color: isDarkMode ? Colors.white : Colors.black,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          isDarkMode = !isDarkMode;
+                        });
+                      },
+                    ),
+                  ),
+                  const Spacer(),
+                ],
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    AppStrings.get('noteworthy'),
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    AppStrings.get('noteworthy_sub'),
+                    style: TextStyle(color: sub, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+            // --- FIRST HORIZONTAL SCROLL WITH RIGHT-SIDE FADEOUT ---
+            SizedBox(
+              height: 210,
+              child: ShaderMask(
+                shaderCallback: (Rect bounds) {
+                  return const LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [Colors.white, Colors.white, Colors.transparent],
+                    stops: [0.75, 0.90, 1.0],
+                  ).createShader(bounds);
+                },
+                blendMode: BlendMode.dstIn,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  children: [
+                    _buildNoteworthyCard(
+                      title: AppStrings.get('mariachi_band'),
+                      time: AppStrings.get('yesterday'),
+                      duration: '0:23',
+                      image: 'assets/Diwali_1.jpg',
+                    ),
+                    const SizedBox(width: 12),
+                    _buildNoteworthyCard(
+                      title: AppStrings.get('flower_delivery'),
+                      time: AppStrings.get('yesterday'),
+                      duration: '0:21',
+                      image: 'assets/Diwali_2.jpg',
+                    ),
+                    const SizedBox(width: 12),
+                    _buildNoteworthyCard(
+                      title: 'the Boy',
+                      time: AppStrings.get('yesterday'),
+                      duration: '0:2',
+                      image: 'assets/profile_1.jpeg',
+                    ),
+                    const SizedBox(width: 12),
+                    _buildNoteworthyCard(
+                      title: 'Cover Shot',
+                      time: AppStrings.get('yesterday'),
+                      duration: '0:21',
+                      image: 'assets/profile_5.jpeg',
+                    ),
+                    const SizedBox(width: 12),
+                    _buildNoteworthyCard(
+                      title: 'Mirror Selfie',
+                      time: AppStrings.get('yesterday'),
+                      duration: '0:21',
+                      image: 'assets/profile_2.jpeg',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text(
+                'All Clips',
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  _buildClipTile(
+                    title: 'People bought ice cream.',
+                    subtitle: 'Yesterday, 6:48 PM\n0:17 • Front Porch',
+                    image: 'assets/profile_1.jpeg',
+                    fg: fg,
+                    sub: sub,
+                  ),
+                  _buildClipTile(
+                    title: 'Morgan and Santiago worked on a bike.',
+                    subtitle: 'Yesterday, 4:35 PM\n0:45 • Driveway',
+                    image: 'assets/profile_2.jpeg',
+                    fg: fg,
+                    sub: sub,
+                  ),
+                  _buildClipTile(
+                    title: 'Morgan and Shauni gardened.',
+                    subtitle: 'Saturday, 11:12 AM\n0:39 • Backyard',
+                    image: 'assets/profile_3.jpeg',
+                    fg: fg,
+                    sub: sub,
+                  ),
+                  _buildClipTile(
+                    title: 'A service van arrived.',
+                    subtitle: 'Saturday, 10:23 AM\n0:22 • Driveway',
+                    image: 'assets/profile_4.jpeg',
+                    fg: fg,
+                    sub: sub,
+                  ),
+                  _buildClipTile(
+                    title: 'A service van arrived.',
+                    subtitle: 'Saturday, 10:23 AM\n0:22 • Driveway',
+                    image: 'assets/profile_5.jpeg',
+                    fg: fg,
+                    sub: sub,
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: searchBg,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: searchBorder),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.search, color: sub, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Search',
+                        style: TextStyle(color: sub, fontSize: 15),
+                      ),
+                    ),
+                    Icon(Icons.mic_none, color: sub, size: 20),
+                    const SizedBox(width: 14),
+                    Icon(Icons.close, color: sub, size: 20),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoteworthyCard({
+    required String title,
+    required String time,
+    required String duration,
+    required String image,
+  }) {
+    return Container(
+      width: 170,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(
+              image,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) =>
+                  Container(color: Colors.grey[850]),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withValues(alpha: 0.85),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+              padding: const EdgeInsets.all(12),
+              alignment: Alignment.bottomLeft,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          time,
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    duration,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClipTile({
+    required String title,
+    required String subtitle,
+    required String image,
+    required Color fg,
+    required Color sub,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset(
+              image,
+              width: 60,
+              height: 60,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                width: 60,
+                height: 60,
+                color: Colors.grey[850],
+                child: const Icon(
+                  Icons.broken_image,
+                  color: Colors.white54,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: fg,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(color: sub, fontSize: 12, height: 1.3),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ChatPage extends StatefulWidget {
+  const ChatPage({super.key});
+
+  @override
+  State<ChatPage> createState() => _ChatPageState();
+}
+
+class _ChatPageState extends State<ChatPage> {
+  bool isDarkMode = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isDarkMode ? const Color(0xFF161616) : Colors.white;
+    final fg = isDarkMode ? Colors.white : Colors.black;
+    final sub = isDarkMode ? Colors.white70 : Colors.black54;
+    final chipBg = isDarkMode ? const Color(0xFF262626) : Colors.grey[200]!;
+
+    return Theme(
+      data: isDarkMode ? ThemeData.dark() : ThemeData.light(),
+      child: Scaffold(
+        backgroundColor: bg,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(
+              isDarkMode ? Icons.light_mode : Icons.dark_mode,
+              color: fg,
+            ),
+            onPressed: () {
+              setState(() {
+                isDarkMode = !isDarkMode;
+              });
+            },
+          ),
+          title: Text('Chats', style: TextStyle(color: fg)),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.camera_alt_outlined, color: fg),
+              onPressed: () {},
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // --- TOP STATUS BAR ---
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 8.0,
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.location_on, color: fg, size: 22),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const FriendMapPage(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: chipBg,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.person_add_alt_1, color: fg, size: 16),
+                          const SizedBox(width: 4),
+                          Icon(Icons.add, color: fg, size: 12),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: chipBg,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: sub,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '1 of 24 uploaded',
+                            style: TextStyle(
+                              color: sub,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // --- TOP HORIZONTAL STORY BUBBLES ---
+              SizedBox(
+                height: 110,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  children: [
+                    _buildStoryBubble(
+                      name: 'Ibiza',
+                      image: 'assets/Chat_1.jpeg',
+                      hasUnread: true,
+                      fg: fg,
+                    ),
+                    _buildStoryBubble(
+                      name: 'Blake',
+                      image: 'assets/Chat_2.jpeg',
+                      fg: fg,
+                    ),
+                    _buildStoryBubble(
+                      name: 'Greece',
+                      image: 'assets/Chat_3.jpeg',
+                      fg: fg,
+                    ),
+                    _buildStoryBubble(
+                      name: 'Greece',
+                      image: 'assets/Chat_4.jpeg',
+                      fg: fg,
+                    ),
+                    _buildStoryBubble(
+                      name: 'Greece',
+                      image: 'assets/Chat_5.jpeg',
+                      fg: fg,
+                    ),
+                    _buildStoryBubble(
+                      name: 'Greece',
+                      image: 'assets/Chat_6.jpeg',
+                      fg: fg,
+                    ),
+                    _buildStoryBubble(
+                      name: 'Greece',
+                      image: 'assets/Chat_5.jpeg',
+                      fg: fg,
+                    ),
+                    _buildStoryBubble(
+                      name: 'Greece',
+                      image: 'assets/Chat_4.jpeg',
+                      fg: fg,
+                    ),
+                    _buildStoryBubble(
+                      name: 'Greece',
+                      image: 'assets/Chat_3.jpeg',
+                      fg: fg,
+                    ),
+                    _buildStoryBubble(
+                      name: 'Greece',
+                      image: 'assets/Chat_2.jpeg',
+                      fg: fg,
+                    ),
+                    _buildStoryBubble(
+                      name: 'Greece',
+                      image: 'assets/Chat_1.jpeg',
+                      fg: fg,
+                    ),
+                  ],
+                ),
+              ),
+
+              // --- CHAT LIST ---
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  children: [
+                    _buildChatTile(
+                      name: 'Oliver Gibbs',
+                      message: 'hahaha',
+                      avatar: 'assets/Chat_1.jpeg',
+                      hasUnreadDot: true,
+                      fg: fg,
+                      sub: sub,
+                    ),
+                    _buildChatTile(
+                      name: 'Soho Farmhouse',
+                      message: 'Will no photos! 📸',
+                      avatar: 'assets/Chat_2.jpeg',
+                      hasUnreadDot: true,
+                      fg: fg,
+                      sub: sub,
+                    ),
+                    _buildChatTile(
+                      name: 'Poppy Jamie',
+                      message: 'more invites pls',
+                      avatar: 'assets/Chat_3.jpeg',
+                      fg: fg,
+                      sub: sub,
+                    ),
+                    _buildChatTile(
+                      name: 'Jacob Riglin',
+                      message: 'seriously love that shot',
+                      avatar: 'assets/Chat_4.jpeg',
+                      fg: fg,
+                      sub: sub,
+                    ),
+                    _buildChatTile(
+                      name: 'Christian Tierney',
+                      message: '🔥🔥🔥',
+                      avatar: 'assets/Chat_5.jpeg',
+                      fg: fg,
+                      sub: sub,
+                    ),
+                    _buildChatTile(
+                      name: 'Team Lapse',
+                      message: 'You just released a new build 🔥',
+                      avatar: 'assets/Chat_6.jpeg',
+                      isSystemBadge: true,
+                      fg: fg,
+                      sub: sub,
+                    ),
+                    _buildChatTile(
+                      name: "Harry's 21st",
+                      message: 'joe perfect 👌',
+                      avatar: 'assets/Chat_1.jpeg',
+                      fg: fg,
+                      sub: sub,
+                    ),
+                    _buildChatTile(
+                      name: 'Anita Grig',
+                      message: 'hey! how are you?',
+                      avatar: 'assets/Chat_2.jpeg',
+                      fg: fg,
+                      sub: sub,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStoryBubble({
+    required String name,
+    required String image,
+    bool hasUnread = false,
+    required Color fg,
+  }) {
+    return Container(
+      width: 72,
+      margin: const EdgeInsets.only(right: 12),
+      child: Column(
+        children: [
+          Stack(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: hasUnread
+                      ? Border.all(color: Colors.blue, width: 2.5)
+                      : Border.all(color: Colors.grey.shade300, width: 1.5),
+                ),
+                child: CircleAvatar(
+                  radius: 26,
+                  backgroundImage: AssetImage(image),
+                  backgroundColor: Colors.grey.shade200,
+                ),
+              ),
+              if (hasUnread)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 14,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w500),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatTile({
+    required String name,
+    required String message,
+    required String avatar,
+    bool hasUnreadDot = false,
+    bool isSystemBadge = false,
+    required Color fg,
+    required Color sub,
+  }) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Stack(
+        children: [
+          CircleAvatar(
+            radius: 26,
+            backgroundImage: AssetImage(avatar),
+            backgroundColor: Colors.grey.shade200,
+          ),
+          if (isSystemBadge)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: const Icon(Icons.verified, size: 10, color: Colors.white),
+              ),
+            ),
+          if (hasUnreadDot)
+            Positioned(
+              right: 0,
+              bottom: 8,
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+              ),
+            ),
+        ],
+      ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              name,
+              style: TextStyle(
+                color: fg,
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Text(
+            '12:30',
+            style: TextStyle(color: sub, fontSize: 11),
+          ),
+        ],
+      ),
+      subtitle: Row(
+        children: [
+          if (isSystemBadge)
+            Container(
+              margin: const EdgeInsets.only(right: 4, top: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade100,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'System',
+                style: TextStyle(
+                  color: Colors.blue.shade700,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: sub, fontSize: 13),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      onTap: () {},
+    );
+  }
+}
+
+class FriendMapPage extends StatefulWidget {
+  const FriendMapPage({super.key});
+
+  @override
+  State<FriendMapPage> createState() => _FriendMapPageState();
+}
+
+class _FriendMapPageState extends State<FriendMapPage> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Friends Map'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.map_outlined, size: 80, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            const Text(
+              'Friend Map',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'See where your friends are',
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ProfilePage extends StatefulWidget {
+  final UserProfile user;
+  const ProfilePage({super.key, required this.user});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF121212) : Colors.white;
+    final fg = isDark ? Colors.white : Colors.black;
+    final sub = isDark ? Colors.white70 : Colors.black54;
+
+    ImageProvider getProfileImage() {
+      if (widget.user.profileImagePath.startsWith('assets/')) {
+        return AssetImage(widget.user.profileImagePath);
+      }
+      return FileImage(File(widget.user.profileImagePath));
+    }
+
+    return Scaffold(
+      backgroundColor: bg,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 280,
+            pinned: true,
+            backgroundColor: bg,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(
+                    'assets/Diwali_1.jpg',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        Container(color: Colors.grey[900]),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.7),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 20,
+                    left: 20,
+                    right: 20,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: 40,
+                          backgroundImage: getProfileImage(),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          widget.user.userName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          widget.user.bio,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _buildStatItem('Posts', '124', fg),
+                      _buildStatItem('Followers', '1.2K', fg),
+                      _buildStatItem('Following', '356', fg),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'About',
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.user.bio,
+                    style: TextStyle(color: sub, fontSize: 15),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Contact',
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildContactRow(Icons.email_outlined, widget.user.email, fg, sub),
+                  _buildContactRow(Icons.phone_outlined, widget.user.phoneNumber, fg, sub),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, Color fg) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              color: fg,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(color: fg.withValues(alpha: 0.6), fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactRow(IconData icon, String text, Color fg, Color sub) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Icon(icon, color: sub, size: 20),
+          const SizedBox(width: 12),
+          Text(text, style: TextStyle(color: fg, fontSize: 15)),
+        ],
+      ),
+    );
+  }
+}
