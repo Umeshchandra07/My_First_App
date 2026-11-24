@@ -1,7 +1,23 @@
-import 'package:material_ui/material_ui.dart';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'user_model.dart';
+
+ImageProvider _resolveImageProvider(
+  String path, {
+  String fallback = 'assets/profile_1.jpeg',
+}) {
+  if (path.startsWith('assets/') || path.isEmpty) {
+    return AssetImage(path.isNotEmpty ? path : fallback);
+  }
+  if (kIsWeb) {
+    return AssetImage(fallback);
+  }
+  return FileImage(File(path));
+}
 
 class _SettingOption {
   final String id;
@@ -105,7 +121,11 @@ class _SettingsPageState extends State<SettingsPage> {
         subtitle: 'Manage connected devices',
         icon: Icons.devices_outlined,
         iconColor: Color(0xFF00C7BE),
-        suboptions: ['Current Session', 'Linked Browsers', 'Terminate Sessions'],
+        suboptions: [
+          'Current Session',
+          'Linked Browsers',
+          'Terminate Sessions',
+        ],
       ),
       _SettingOption(
         id: 'power_saving',
@@ -113,7 +133,11 @@ class _SettingsPageState extends State<SettingsPage> {
         subtitle: 'Reduce power usage on low charge',
         icon: Icons.battery_saver_outlined,
         iconColor: Color(0xFFFF9500),
-        suboptions: ['Auto Battery Mode', 'Disable Animations', 'Lower Frame Rate'],
+        suboptions: [
+          'Auto Battery Mode',
+          'Disable Animations',
+          'Lower Frame Rate',
+        ],
       ),
       _SettingOption(
         id: 'language',
@@ -175,7 +199,11 @@ class _SettingsPageState extends State<SettingsPage> {
         subtitle: '',
         icon: Icons.help_outline,
         iconColor: Color(0xFF2AABEE),
-        suboptions: ['Getting Started', 'Account & Security', 'Troubleshooting'],
+        suboptions: [
+          'Getting Started',
+          'Account & Security',
+          'Troubleshooting',
+        ],
       ),
       _SettingOption(
         id: 'app_features',
@@ -191,7 +219,11 @@ class _SettingsPageState extends State<SettingsPage> {
         subtitle: '',
         icon: Icons.verified_user_outlined,
         iconColor: Color(0xFF34C759),
-        suboptions: ['Data Collection', 'Terms of Service', 'Cookie Preferences'],
+        suboptions: [
+          'Data Collection',
+          'Terms of Service',
+          'Cookie Preferences',
+        ],
       ),
     ],
   ];
@@ -211,25 +243,61 @@ class _SettingsPageState extends State<SettingsPage> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
         ),
-        builder: (_) => _SuboptionsPanel(
-          option: option,
-          animTick: _animTick,
-          onSuboptionTap: (sub) {
-            Navigator.pop(context);
-            _onSuboptionSelected(sub);
-          },
-        ),
+        builder: (_) => option.id == 'account'
+            ? AnimatedSwitcher(
+                duration: Duration(
+                  milliseconds: _MotionPreset.forOption(option.id).panelMs,
+                ),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (Widget child, Animation<double> animation) {
+                  final curved = CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  );
+                  final slideTween = Tween<Offset>(
+                    begin: const Offset(-1.0, 0.0),
+                    end: Offset.zero,
+                  );
+                  return ClipRect(
+                    child: FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: slideTween.animate(curved),
+                        child: child,
+                      ),
+                    ),
+                  );
+                },
+                child: _AccountDashboardPanel(
+                  key: ValueKey<String>('${option.id}_$_animTick'),
+                  onSuboptionTap: (sub) {
+                    Navigator.pop(context);
+                    _handleSuboptionTap(sub);
+                  },
+                ),
+              )
+            : _SuboptionsPanel(
+                option: option,
+                animTick: _animTick,
+                onSuboptionTap: (sub) {
+                  Navigator.pop(context);
+                  _handleSuboptionTap(sub);
+                },
+              ),
       );
     }
   }
 
-  void _onSuboptionSelected(String sub) {
-    if (_selectedOption.id == 'account') {
-      _openEditAccountField(sub);
-    } else {
-      setState(() => _animTick++);
-      _showSnack('${_selectedOption.title} -> $sub');
+  void _handleSuboptionTap(String title) {
+    if (title == 'Phone Number' ||
+        title == 'Username' ||
+        title == 'Bio' ||
+        title == 'Email Address') {
+      _openEditAccountField(title);
+      return;
     }
+    _showSnack('Selected: $title');
   }
 
   void _showSnack(String message) {
@@ -341,8 +409,9 @@ class _SettingsPageState extends State<SettingsPage> {
     final updatedProfile = UserProfile(
       userName: fieldLabel == 'Username' ? updatedValue : current.userName,
       email: fieldLabel == 'Email Address' ? updatedValue : current.email,
-      phoneNumber:
-          fieldLabel == 'Phone Number' ? updatedValue : current.phoneNumber,
+      phoneNumber: fieldLabel == 'Phone Number'
+          ? updatedValue
+          : current.phoneNumber,
       bio: fieldLabel == 'Bio' ? updatedValue : current.bio,
       profileImagePath: current.profileImagePath,
     );
@@ -379,10 +448,10 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildProfileHeader(UserProfile currentUser) {
-    final String displayName =
-        currentUser.userName.isNotEmpty ? currentUser.userName : 'User';
-    final String handle =
-        '@${displayName.toLowerCase().replaceAll(' ', '_')}';
+    final String displayName = currentUser.userName.isNotEmpty
+        ? currentUser.userName
+        : 'User';
+    final String handle = '@${displayName.toLowerCase().replaceAll(' ', '_')}';
     final String phoneText = currentUser.phoneNumber.isNotEmpty
         ? currentUser.phoneNumber
         : 'Add mobile number';
@@ -396,7 +465,9 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               CircleAvatar(
                 radius: 44,
-                backgroundColor: Colors.blueGrey.shade200,
+                backgroundImage: _resolveImageProvider(
+                  _activeUser.profileImagePath,
+                ),
                 child: const Icon(Icons.person, size: 46, color: Colors.white),
               ),
               Positioned(
@@ -476,8 +547,7 @@ class _SettingsPageState extends State<SettingsPage> {
               style: TextStyle(fontSize: 12.5, color: Colors.black54),
               children: [
                 TextSpan(
-                  text:
-                      'Keep your number up to date to ensure you can always sign in. ',
+                  text: 'Keep your number up to date to ensure you can always sign in. ',
                 ),
                 TextSpan(
                   text: 'Learn more',
@@ -577,9 +647,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   child: AnimatedContainer(
                     duration: Duration(milliseconds: itemPreset.panelMs),
                     curve: itemPreset.curve,
-                    color: isSelected
-                        ? itemPreset.bgColor
-                        : Colors.transparent,
+                    color: isSelected ? itemPreset.bgColor : Colors.transparent,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 12,
@@ -593,11 +661,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             color: item.iconColor,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(
-                            item.icon,
-                            color: Colors.white,
-                            size: 18,
-                          ),
+                          child: Icon(item.icon, color: Colors.white, size: 18),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -647,7 +711,10 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildLeftList({required bool isWide, required UserProfile currentUser}) {
+  Widget _buildLeftList({
+    required bool isWide,
+    required UserProfile currentUser,
+  }) {
     return Container(
       color: _bgGrey,
       child: Column(
@@ -703,7 +770,10 @@ class _SettingsPageState extends State<SettingsPage> {
                     SizedBox(
                       width: 370,
                       height: double.infinity,
-                      child: _buildLeftList(isWide: true, currentUser: currentUser),
+                      child: _buildLeftList(
+                        isWide: true,
+                        currentUser: currentUser,
+                      ),
                     ),
                     const VerticalDivider(width: 1),
                     // Right side: suboptions for the selected setting
@@ -716,14 +786,56 @@ class _SettingsPageState extends State<SettingsPage> {
                         padding: const EdgeInsets.all(32),
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 620),
-                          child: _SuboptionsPanel(
-                            option: _selectedOption,
-                            animTick: _animTick,
-                            onSuboptionTap: (sub) {
-                              setState(() => _animTick++);
-                              _onSuboptionSelected(sub);
-                            },
-                          ),
+                          child: _selectedOption.id == 'account'
+                              ? AnimatedSwitcher(
+                                  duration: Duration(
+                                    milliseconds: preset.panelMs,
+                                  ),
+                                  switchInCurve: Curves.easeOutCubic,
+                                  switchOutCurve: Curves.easeInCubic,
+                                  transitionBuilder:
+                                      (
+                                        Widget child,
+                                        Animation<double> animation,
+                                      ) {
+                                        final curved = CurvedAnimation(
+                                          parent: animation,
+                                          curve: Curves.easeOutCubic,
+                                        );
+                                        final slideTween = Tween<Offset>(
+                                          begin: const Offset(-1.0, 0.0),
+                                          end: Offset.zero,
+                                        );
+                                        return ClipRect(
+                                          child: FadeTransition(
+                                            opacity: animation,
+                                            child: SlideTransition(
+                                              position: slideTween.animate(
+                                                curved,
+                                              ),
+                                              child: child,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                  child: _AccountDashboardPanel(
+                                    key: ValueKey<String>(
+                                      '${_selectedOption.id}_$_animTick',
+                                    ),
+                                    onSuboptionTap: (sub) {
+                                      setState(() => _animTick++);
+                                      _handleSuboptionTap(sub);
+                                    },
+                                  ),
+                                )
+                              : _SuboptionsPanel(
+                                  option: _selectedOption,
+                                  animTick: _animTick,
+                                  onSuboptionTap: (sub) {
+                                    setState(() => _animTick++);
+                                    _handleSuboptionTap(sub);
+                                  },
+                                ),
                         ),
                       ),
                     ),
@@ -735,7 +847,8 @@ class _SettingsPageState extends State<SettingsPage> {
             return Scaffold(
               backgroundColor: _bgGrey,
               body: SafeArea(
-                  child: _buildLeftList(isWide: false, currentUser: currentUser)),
+                child: _buildLeftList(isWide: false, currentUser: currentUser),
+              ),
             );
           },
         );
@@ -1158,10 +1271,9 @@ class _SuboptionsPanel extends StatelessWidget {
                 curve: preset.curve,
                 builder: (context, value, child) {
                   final clamped = value.clamp(0.0, 1.0);
-                  final double itemScale = preset.beginScale +
-                      ((1.0 - preset.beginScale) * clamped);
-                  final double itemAngle =
-                      preset.beginAngle * (1.0 - clamped);
+                  final double itemScale =
+                      preset.beginScale + ((1.0 - preset.beginScale) * clamped);
+                  final double itemAngle = preset.beginAngle * (1.0 - clamped);
 
                   return Opacity(
                     opacity: clamped,
@@ -1172,10 +1284,7 @@ class _SuboptionsPanel extends StatelessWidget {
                       ),
                       child: Transform.rotate(
                         angle: itemAngle,
-                        child: Transform.scale(
-                          scale: itemScale,
-                          child: child,
-                        ),
+                        child: Transform.scale(scale: itemScale, child: child),
                       ),
                     ),
                   );
@@ -1207,6 +1316,905 @@ class _SuboptionsPanel extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AccountDashboardPanel extends StatefulWidget {
+  final ValueChanged<String> onSuboptionTap;
+
+  const _AccountDashboardPanel({super.key, required this.onSuboptionTap});
+
+  @override
+  State<_AccountDashboardPanel> createState() => _AccountDashboardPanelState();
+}
+
+class _AccountDashboardPanelState extends State<_AccountDashboardPanel> {
+  static const Color _oliveBg = Color(0xFF678D4B);
+  static const Color _oliveDarkStrip = Color(0xFF56793D);
+  static const Color _charcoalCard = Color(0xFF141614);
+  static const Color _charcoalTile = Color(0xFF1E211E);
+  static const Color _creamCard = Color(0xFFF4F7EE);
+  static const Color _limeAccent = Color(0xFF9ED468);
+
+  String _activeTopTab = 'Account';
+  String _activeFilter = 'All';
+  int _selectedDay = 18;
+  bool _twoFactorEnabled = true;
+  bool _privateAccountEnabled = true;
+
+  static const List<String> _topTabs = [
+    'Profile',
+    'Personal Info',
+    'Security',
+    'Account',
+    'Privacy',
+    'Linked',
+    'Data',
+  ];
+
+  static const List<String> _filters = [
+    'All',
+    'Username',
+    'Phone Number',
+    'Email Address',
+    'Bio',
+    'Password',
+    'Privacy',
+  ];
+
+  UserProfile get _user =>
+      globalUserNotifier.value ??
+      UserProfile(
+        userName: 'Member',
+        email: 'member@example.com',
+        phoneNumber: '9876543210',
+        bio: 'Account bio',
+        profileImagePath: 'assets/profile_1.jpeg',
+      );
+
+  int _completionPercent(UserProfile p) {
+    int filled = 0;
+    if (p.userName.trim().isNotEmpty) filled++;
+    if (p.phoneNumber.trim().length == 10) filled++;
+    if (p.email.trim().isNotEmpty) filled++;
+    if (p.bio.trim().isNotEmpty) filled++;
+    return ((filled / 4) * 100).round();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<UserProfile?>(
+      valueListenable: globalUserNotifier,
+      builder: (context, _, _) {
+        final profile = _user;
+        final String displayName = profile.userName.isNotEmpty
+            ? profile.userName
+            : 'Member';
+        final String displayPhone = profile.phoneNumber.isNotEmpty
+            ? profile.phoneNumber
+            : '0000000000';
+        final String displayEmail = profile.email.isNotEmpty
+            ? profile.email
+            : 'user@domain.com';
+        final String displayBio = profile.bio.isNotEmpty
+            ? profile.bio
+            : 'Add your bio';
+        final int completion = _completionPercent(profile);
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: _oliveBg,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.16),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. TOP NAVIGATION BAR (Logo + Pill Tabs + User Profile Badge)
+                Row(
+                  children: [
+                    const Text(
+                      'ac',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -1.0,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _oliveDarkStrip,
+                          borderRadius: BorderRadius.circular(26),
+                        ),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              for (final tab in _topTabs)
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() => _activeTopTab = tab);
+                                    if (tab == 'Personal Info') {
+                                      widget.onSuboptionTap('Username');
+                                    } else if (tab == 'Security') {
+                                      widget.onSuboptionTap('Change Password');
+                                    } else if (tab == 'Privacy') {
+                                      widget.onSuboptionTap('Account Privacy');
+                                    }
+                                  },
+                                  child: Container(
+                                    margin: const EdgeInsets.only(right: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 13,
+                                      vertical: 7,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _activeTopTab == tab
+                                          ? _charcoalCard
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      tab,
+                                      style: TextStyle(
+                                        color: _activeTopTab == tab
+                                            ? Colors.white
+                                            : Colors.white70,
+                                        fontSize: 11.5,
+                                        fontWeight: _activeTopTab == tab
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    CircleAvatar(
+                      radius: 17,
+                      backgroundColor: _charcoalCard,
+                      child: Text(
+                        displayName.characters.first.toUpperCase(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          '@${displayName.toLowerCase().replaceAll(' ', '_')}',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => widget.onSuboptionTap('Username'),
+                      child: Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: const BoxDecoration(
+                          color: _oliveDarkStrip,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.settings_outlined,
+                          color: Colors.white,
+                          size: 15,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                // 2. HEADER TITLE + COMPLETION RING + 3 ACCOUNT STATS
+                Wrap(
+                  spacing: 20,
+                  runSpacing: 14,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  alignment: WrapAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Account\nSettings',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 30,
+                            fontWeight: FontWeight.w600,
+                            height: 1.06,
+                          ),
+                        ),
+                        const SizedBox(width: 18),
+                        SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                value: completion / 100.0,
+                                strokeWidth: 4.5,
+                                backgroundColor: Colors.white.withValues(
+                                  alpha: 0.22,
+                                ),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  _charcoalCard,
+                                ),
+                              ),
+                              Text(
+                                '$completion%',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _metricBlock('Mobile Number', displayPhone),
+                        const SizedBox(width: 22),
+                        _metricBlock('Username', displayName),
+                        const SizedBox(width: 22),
+                        _metricBlock('Email ID', displayEmail),
+                      ],
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 18),
+
+                // 3. ACCOUNT OPTION FILTER CHIPS ROW
+                Row(
+                  children: [
+                    Expanded(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final label in _filters)
+                            GestureDetector(
+                              onTap: () {
+                                setState(() => _activeFilter = label);
+                                if (label == 'Username' ||
+                                    label == 'Phone Number' ||
+                                    label == 'Email Address' ||
+                                    label == 'Bio') {
+                                  widget.onSuboptionTap(label);
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 15,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _activeFilter == label
+                                      ? _charcoalCard
+                                      : _oliveDarkStrip,
+                                  borderRadius: BorderRadius.circular(22),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.14),
+                                  ),
+                                ),
+                                child: Text(
+                                  label,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          GestureDetector(
+                            onTap: () => widget.onSuboptionTap('Add Account'),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: _oliveDarkStrip,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.add,
+                                color: Colors.white,
+                                size: 15,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 18),
+
+                // 4. MAIN SPLIT CARDS (CHARCOAL CARD LEFT + 2 CREAM CARDS RIGHT)
+                LayoutBuilder(
+                  builder: (context, box) {
+                    final bool stacked = box.maxWidth < 560;
+                    final darkWidget = _buildDarkAccountCard(
+                      displayName: displayName,
+                      displayPhone: displayPhone,
+                      displayEmail: displayEmail,
+                      displayBio: displayBio,
+                    );
+                    final rightCardsWidget = Column(
+                      children: [
+                        _buildLightFieldCard(
+                          icon: Icons.verified_user_outlined,
+                          title: 'Two-Step Verification',
+                          subtitle: 'SMS & Authenticator on $displayPhone',
+                          badgeText: _twoFactorEnabled ? 'Active' : 'Off',
+                          isOn: _twoFactorEnabled,
+                          onToggle: (v) {
+                            setState(() => _twoFactorEnabled = v);
+                            widget.onSuboptionTap('Two-Step Verification');
+                          },
+                          onEdit: () => widget.onSuboptionTap('Phone Number'),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildLightFieldCard(
+                          icon: Icons.lock_outline,
+                          title: 'Private Account',
+                          subtitle: '$displayEmail · $displayBio',
+                          badgeText: _privateAccountEnabled
+                              ? 'Private'
+                              : 'Public',
+                          isOn: _privateAccountEnabled,
+                          onToggle: (v) {
+                            setState(() => _privateAccountEnabled = v);
+                            widget.onSuboptionTap('Account Privacy');
+                          },
+                          onEdit: () => widget.onSuboptionTap('Email Address'),
+                        ),
+                      ],
+                    );
+
+                    if (stacked) {
+                      return Column(
+                        children: [
+                          darkWidget,
+                          const SizedBox(height: 12),
+                          rightCardsWidget,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 7, child: darkWidget),
+                        const SizedBox(width: 14),
+                        Expanded(flex: 4, child: rightCardsWidget),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _metricBlock(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 10.5),
+        ),
+        const SizedBox(height: 2),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 140),
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDarkAccountCard({
+    required String displayName,
+    required String displayPhone,
+    required String displayEmail,
+    required String displayBio,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _charcoalCard,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top row inside dark card
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 17,
+                backgroundColor: Colors.white,
+                child: Icon(Icons.person, color: _charcoalCard, size: 19),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      displayBio,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: () => widget.onSuboptionTap('Bio'),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: _charcoalTile,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.edit_outlined,
+                    color: Colors.white70,
+                    size: 16,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => widget.onSuboptionTap('Download Your Data'),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: _charcoalTile,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.open_in_full,
+                    color: Colors.white70,
+                    size: 15,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // 3 Inner Columns (Date Grid | Account Options | Security Bars)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Login / Backup Date Grid
+              Expanded(
+                flex: 4,
+                child: Container(
+                  padding: const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    color: _charcoalTile,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Last login date',
+                        style: TextStyle(color: Colors.white70, fontSize: 10.5),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: [
+                          for (int d = 1; d <= 28; d++)
+                            GestureDetector(
+                              onTap: () => setState(() => _selectedDay = d),
+                              child: Container(
+                                width: 18,
+                                height: 18,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: _selectedDay == d
+                                      ? Colors.white
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(9),
+                                ),
+                                child: Text(
+                                  '$d',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: _selectedDay == d
+                                        ? _charcoalCard
+                                        : Colors.white60,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 10),
+
+              // 2. Account Options Chips (Edit any field directly)
+              Expanded(
+                flex: 4,
+                child: Container(
+                  padding: const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    color: _charcoalTile,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Account options',
+                        style: TextStyle(color: Colors.white70, fontSize: 10.5),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _accountOptionPill('Username'),
+                          _accountOptionPill('Phone Number'),
+                          _accountOptionPill('Bio'),
+                          _accountOptionPill('Email Address'),
+                          _accountOptionPill('Change Password'),
+                          _accountOptionPill('Delete Account'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 10),
+
+              // 3. Green Verification Bars Box
+              Expanded(
+                flex: 3,
+                child: Container(
+                  padding: const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    color: _oliveDarkStrip,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Verified',
+                        style: TextStyle(color: Colors.white, fontSize: 10.5),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: _barColumn('Mail', 34, Colors.white70),
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: _barColumn('Phone', 46, _charcoalCard),
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(child: _barColumn('2FA', 58, _limeAccent)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Bottom Summary Strip + Lime Confirm Button
+          Row(
+            children: [
+              Expanded(child: _bottomStat('Active day', '${_selectedDay}th')),
+              Expanded(child: _bottomStat('Phone', displayPhone)),
+              Expanded(child: _bottomStat('Account', displayName)),
+              GestureDetector(
+                onTap: () => widget.onSuboptionTap('Phone Number'),
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: const BoxDecoration(
+                    color: _limeAccent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check,
+                    color: _charcoalCard,
+                    size: 18,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _barColumn(String tag, double height, Color barColor) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          height: height,
+          decoration: BoxDecoration(
+            color: barColor,
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        const SizedBox(height: 5),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+          decoration: BoxDecoration(
+            color: _charcoalCard.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            tag,
+            style: const TextStyle(color: Colors.white, fontSize: 8.5),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _accountOptionPill(String optionLabel) {
+    final bool isHighlighted =
+        optionLabel == 'Phone Number' || optionLabel == 'Username';
+    return GestureDetector(
+      onTap: () => widget.onSuboptionTap(optionLabel),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: isHighlighted ? Colors.white : _charcoalCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Text(
+          optionLabel,
+          style: TextStyle(
+            color: isHighlighted ? _charcoalCard : Colors.white,
+            fontSize: 10.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _bottomStat(String title, String val) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(color: Colors.white54, fontSize: 10),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          val,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLightFieldCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String badgeText,
+    required bool isOn,
+    required ValueChanged<bool> onToggle,
+    required VoidCallback onEdit,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: _creamCard,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(icon, color: _charcoalCard, size: 18),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _charcoalCard,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: onEdit,
+                child: Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: const Icon(
+                    Icons.edit_outlined,
+                    color: _charcoalCard,
+                    size: 15,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.black54, fontSize: 11),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                badgeText,
+                style: const TextStyle(
+                  color: _charcoalCard,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.black12,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: () => onToggle(false),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Icon(
+                          Icons.close,
+                          size: 13,
+                          color: !isOn ? _charcoalCard : Colors.black45,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => onToggle(true),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: isOn ? _limeAccent : Colors.transparent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check,
+                          size: 12,
+                          color: _charcoalCard,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
