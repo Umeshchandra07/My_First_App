@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/services.dart';
 
 import 'user_model.dart';
 
@@ -242,6 +243,14 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  String _extractTenDigits(String rawPhone) {
+    final digitsOnly = rawPhone.replaceAll(RegExp(r'\D'), '');
+    if (digitsOnly.length > 10) {
+      return digitsOnly.substring(digitsOnly.length - 10);
+    }
+    return digitsOnly;
+  }
+
   Future<void> _openEditAccountField(String fieldLabel) async {
     final current = _activeUser;
     String initialValue = '';
@@ -250,8 +259,8 @@ class _SettingsPageState extends State<SettingsPage> {
 
     switch (fieldLabel) {
       case 'Phone Number':
-        initialValue = current.phoneNumber;
-        keyboardType = TextInputType.phone;
+        initialValue = _extractTenDigits(current.phoneNumber);
+        keyboardType = TextInputType.number;
         break;
       case 'Username':
         initialValue = current.userName;
@@ -267,34 +276,63 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     final controller = TextEditingController(text: initialValue);
+    String? errorText;
 
     final String? updatedValue = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Edit $fieldLabel'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: keyboardType,
-          maxLines: maxLines,
-          decoration: InputDecoration(
-            hintText: 'Enter $fieldLabel',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Text('Edit $fieldLabel'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: keyboardType,
+              maxLines: maxLines,
+              maxLength: fieldLabel == 'Phone Number' ? 10 : null,
+              inputFormatters: fieldLabel == 'Phone Number'
+                  ? <TextInputFormatter>[
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ]
+                  : null,
+              onChanged: (_) {
+                if (errorText != null) {
+                  setDialogState(() => errorText = null);
+                }
+              },
+              decoration: InputDecoration(
+                hintText: fieldLabel == 'Phone Number'
+                    ? 'Enter 10-digit mobile number'
+                    : 'Enter $fieldLabel',
+                errorText: errorText,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            style: FilledButton.styleFrom(backgroundColor: _accentBlue),
-            child: const Text('Save'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final value = controller.text.trim();
+                  if (fieldLabel == 'Phone Number' && value.length != 10) {
+                    setDialogState(() {
+                      errorText = 'Please enter a valid 10-digit number';
+                    });
+                    return;
+                  }
+                  Navigator.pop(ctx, value);
+                },
+                style: FilledButton.styleFrom(backgroundColor: _accentBlue),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
       ),
     );
 
